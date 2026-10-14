@@ -4,6 +4,7 @@ __pycache__/
 node_modules/
 backend/app/storage/uploads/
 
-# Fine-tuned T5 model (too large for GitHub; files > 100 MB are rejected)
-t5-pubmed-finetuned/
+# Fine-tuned T5 model: only the final model files are tracked (weights via Git LFS)
 t5-pubmed-finetuned.zip
+t5-pubmed-finetuned/checkpoint-*/
+t5-pubmed-finetuned/training_args.bin
