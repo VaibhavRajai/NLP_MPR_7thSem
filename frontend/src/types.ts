@@ -115,5 +115,7 @@ export interface AnalysisResponse {
   processing_stages_completed: string[];
   domain_validation: HealthcareValidationResult;
   instruction_focus_applied?: string;
+  summary_method?: string;
+  query_applied?: string;
   stage_records?: StageExecutionRecord[];
 }

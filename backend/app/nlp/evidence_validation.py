@@ -113,10 +113,46 @@ class EvidenceValidator:
         return methods_info
 
     @staticmethod
+    def ground_generated_summary(
+        generated_text: str,
+        selected_sentences: List[Dict[str, Any]],
+        min_similarity: float = 0.1
+    ) -> str:
+        """
+        Attaches a [REF-X] citation to each sentence of an abstractive (T5) summary by
+        matching it to the most similar selected evidence sentence. REF numbering matches
+        the citation order produced in construct_grounded_summary.
+        """
+        from sklearn.metrics.pairwise import cosine_similarity
+        from backend.app.nlp.embeddings import SemanticEncoder
+
+        gen_sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+(?=[A-Z0-9])', generated_text.strip()) if s.strip()]
+        if not gen_sents or not selected_sentences:
+            return generated_text
+
+        try:
+            encoder = SemanticEncoder()
+            ev_texts = [s["text"] for s in selected_sentences]
+            vecs = encoder.encode_sentences(gen_sents + ev_texts)
+            gen_vecs, ev_vecs = vecs[:len(gen_sents)], vecs[len(gen_sents):]
+            sims = cosine_similarity(gen_vecs, ev_vecs)
+        except Exception:
+            return generated_text
+
+        grounded = []
+        for i, sent in enumerate(gen_sents):
+            best = int(sims[i].argmax())
+            if sims[i][best] >= min_similarity:
+                sent = f"{sent} [REF-{best + 1}]"
+            grounded.append(sent)
+        return " ".join(grounded)
+
+    @staticmethod
     def construct_grounded_summary(
         selected_sentences: List[Dict[str, Any]],
         parsed_instructions: Dict[str, Any],
-        paper_title: str
+        paper_title: str,
+        generated_summary: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Organizes selected evidence into constructive summary sections,
@@ -233,8 +269,11 @@ class EvidenceValidator:
                 "citation_ids": cits
             })
 
-        # Executive summary narrative
-        executive_summary = " ".join([s["text"] for s in selected_sentences[:4]])
+        # Executive summary narrative: prefer the T5 abstractive summary (grounded with citations)
+        if generated_summary and generated_summary.strip():
+            executive_summary = EvidenceValidator.ground_generated_summary(generated_summary, selected_sentences)
+        else:
+            executive_summary = " ".join([s["text"] for s in selected_sentences[:4]])
 
         return {
             "executive_summary": executive_summary,

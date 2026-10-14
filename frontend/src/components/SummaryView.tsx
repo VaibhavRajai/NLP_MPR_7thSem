@@ -92,6 +92,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({ analysis, onReset }) =
               Focus: {analysis.instruction_focus_applied}
             </span>
           )}
+          {analysis.summary_method && (
+            <span className="bg-violet-500/10 text-violet-300 border border-violet-500/30 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs">
+              {analysis.summary_method}
+            </span>
+          )}
+          {analysis.query_applied && (
+            <span className="bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs truncate max-w-full">
+              Query: {analysis.query_applied}
+            </span>
+          )}
         </div>
 
         <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight leading-snug break-words">

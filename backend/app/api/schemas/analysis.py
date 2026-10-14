@@ -76,4 +76,6 @@ class AnalysisResponse(BaseModel):
     processing_stages_completed: List[str]
     domain_validation: Dict[str, Any]
     instruction_focus_applied: Optional[str] = None
+    summary_method: Optional[str] = None
+    query_applied: Optional[str] = None
     stage_records: List[StageExecutionRecord] = []

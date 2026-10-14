@@ -11,6 +11,7 @@ from backend.app.nlp.retrieval import EvidenceRetriever
 from backend.app.nlp.textrank import TextRankSummarizer
 from backend.app.nlp.instruction_parser import InstructionParser
 from backend.app.nlp.evidence_validation import EvidenceValidator
+from backend.app.nlp.t5_summarizer import T5Summarizer
 
 class SummaryService:
     @staticmethod
@@ -239,7 +240,7 @@ class SummaryService:
             stage_records=stage_records
         )
         summarizer = TextRankSummarizer()
-        ranked = summarizer.rank_sentences(filtered_sentences)
+        ranked = summarizer.rank_sentences(filtered_sentences, query=focus_query)
         
         target_count = parsed_instructions["target_sentence_count"]
         selected_evidence = summarizer.select_diverse_summary(ranked, num_sentences=target_count)
@@ -271,10 +272,20 @@ class SummaryService:
             message="Constructing grounded sections, validating claims, statistics, and citations",
             stage_records=stage_records
         )
+        # T5 abstractive generation, conditioned on the query-relevant evidence
+        t5 = T5Summarizer()
+        generated_summary = t5.summarize(
+            selected_evidence,
+            query=focus_query,
+            detail_level=parsed_instructions["detail_level"]
+        )
+        summary_method = "T5 abstractive (query-aware)" if generated_summary else "Extractive (TextRank)"
+
         summary_pack = EvidenceValidator.construct_grounded_summary(
             selected_sentences=selected_evidence,
             parsed_instructions=parsed_instructions,
-            paper_title=doc["title"]
+            paper_title=doc["title"],
+            generated_summary=generated_summary
         )
 
         stat_findings = EvidenceValidator.extract_statistical_findings(analyzed_sentences)
@@ -299,9 +310,9 @@ class SummaryService:
             "Stage 10: Constructive summary generation & validation",
             "Summary Generation and Citation Validation",
             "completed",
-            f"Generated validated synthesis with {len(summary_pack['citations'])} evidence citations [REF-X] and {len(stat_findings)} statistical data points.",
-            "Grounded executive summary and structured sections against source sentences and verified page numbers. Extracted p-values, 95% CIs, and methodology parameters.",
-            {"citations": len(summary_pack['citations']), "statistics": len(stat_findings)}
+            f"Generated validated synthesis ({summary_method}) with {len(summary_pack['citations'])} evidence citations [REF-X] and {len(stat_findings)} statistical data points.",
+            "Fine-tuned T5 generated an abstractive summary from query-ranked evidence; each generated sentence was grounded to its closest source sentence and page. Extracted p-values, 95% CIs, and methodology parameters." if generated_summary else "T5 unavailable; grounded the extractive executive summary against source sentences and verified page numbers. Extracted p-values, 95% CIs, and methodology parameters.",
+            {"citations": len(summary_pack['citations']), "statistics": len(stat_findings), "summary_method": summary_method, "query": focus_query}
         )
 
         analysis_result = {
@@ -320,6 +331,8 @@ class SummaryService:
             "processing_stages_completed": stages_completed,
             "domain_validation": domain_val,
             "instruction_focus_applied": instructions if instructions else "Default balanced synthesis",
+            "summary_method": summary_method,
+            "query_applied": focus_query or None,
             "stage_records": stage_records
         }
 

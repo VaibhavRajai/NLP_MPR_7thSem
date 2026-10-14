@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 from typing import List, Dict, Any, Optional
+from sklearn.metrics.pairwise import cosine_similarity
 from backend.app.nlp.embeddings import SemanticEncoder
 from backend.app.core.logging import logger
 
@@ -27,7 +28,9 @@ class TextRankSummarizer:
         sentences: List[Dict[str, Any]],
         instruction_bias_vector: Optional[np.ndarray] = None,
         damping: float = 0.85,
-        max_iter: int = 100
+        max_iter: int = 100,
+        query: Optional[str] = None,
+        query_weight: float = 2.0
     ) -> List[Dict[str, Any]]:
         if not sentences:
             return []
@@ -65,6 +68,18 @@ class TextRankSummarizer:
 
             priors[i] = sec_w * stat_bonus * length_factor
 
+        # Query conditioning: boost sentences semantically related to the user's query/topic
+        query_sims = None
+        if query and query.strip():
+            try:
+                vecs = self.encoder.encode_sentences([query] + texts)
+                q_vec = vecs[0].reshape(1, -1)
+                query_sims = np.clip(cosine_similarity(q_vec, vecs[1:])[0], 0.0, None)
+                for i in range(n):
+                    priors[i] *= (1.0 + query_weight * float(query_sims[i]))
+            except Exception as e:
+                logger.warning(f"Query-aware ranking skipped: {e}")
+
         # Normalize personalization vector
         total_prior = sum(priors.values())
         if total_prior > 0:
@@ -83,6 +98,8 @@ class TextRankSummarizer:
         for i, s in enumerate(sentences):
             item = dict(s)
             item["textrank_score"] = float(scores.get(i, 0.0))
+            if query_sims is not None:
+                item["query_similarity"] = float(query_sims[i])
             scored_sentences.append(item)
 
         scored_sentences.sort(key=lambda x: x["textrank_score"], reverse=True)

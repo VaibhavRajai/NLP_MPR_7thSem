@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+node_modules/
+backend/app/storage/uploads/
+
+# Fine-tuned T5 model (too large for GitHub; files > 100 MB are rejected)
+t5-pubmed-finetuned/
+t5-pubmed-finetuned.zip
